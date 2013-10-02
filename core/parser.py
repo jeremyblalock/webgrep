@@ -1,5 +1,8 @@
-import utils, re, urllib2, math, sys
+import utils, re, urllib2, math, sys, urllib, codecs
 from bs4 import BeautifulSoup
+
+import html5lib
+from html5lib import sanitizer
 
 class FileParser(object):
 
@@ -46,6 +49,7 @@ class FileParser(object):
     def __init__(self, url):
         self.url = url
         self.retrieve(url)
+        self.clean_raw()
         self.soup = BeautifulSoup(self.raw)
 
     def retrieve(self, url):
@@ -56,6 +60,22 @@ class FileParser(object):
             self.raw = tmp
         except:
             self.raw = ''
+
+    def clean_raw(self):
+        parser = html5lib.HTMLParser(
+            tree=html5lib.treebuilders.getTreeBuilder("dom"),
+            tokenizer=sanitizer.HTMLSanitizer)
+        html5lib_object = parser.parse(self.raw)
+        walker = html5lib.treewalkers.getTreeWalker("dom")
+        stream = walker(html5lib_object)
+        s = html5lib.serializer.htmlserializer.HTMLSerializer(
+            omit_optional_tags=False)
+        output_generator = s.serialize(stream)
+        def removeNonAscii(s): return "".join(i for i in s if ord(i)<0)
+        html_string = ' '.join([itm for itm in output_generator])
+
+        self.raw = html_string
+
 
     def search(self, pattern):
         body = self.soup.find('body')
