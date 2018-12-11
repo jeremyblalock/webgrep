@@ -1,8 +1,8 @@
 import utils, re, urllib2, math, sys, urllib, codecs
 from bs4 import BeautifulSoup
 
-import html5lib
-from html5lib import sanitizer
+from html5lib.html5parser import parse
+from html5lib.serializer import serialize
 
 class FileParser(object):
 
@@ -50,7 +50,7 @@ class FileParser(object):
         self.url = url
         self.retrieve(url)
         self.clean_raw()
-        self.soup = BeautifulSoup(self.raw)
+        self.soup = BeautifulSoup(self.raw, features='html5lib')
 
     def retrieve(self, url):
         try:
@@ -62,32 +62,41 @@ class FileParser(object):
             self.raw = ''
 
     def clean_raw(self):
-        parser = html5lib.HTMLParser(
-            tree=html5lib.treebuilders.getTreeBuilder("dom"),
-            tokenizer=sanitizer.HTMLSanitizer)
-        html5lib_object = parser.parse(self.raw)
-        walker = html5lib.treewalkers.getTreeWalker("dom")
-        stream = walker(html5lib_object)
-        s = html5lib.serializer.htmlserializer.HTMLSerializer(
-            omit_optional_tags=False)
-        output_generator = s.serialize(stream)
+        # parser = html5lib.HTMLParser(tree=html5lib.getTreeBuilder("dom"))
+        html5lib_object = parse(self.raw)
+        output_generator = serialize(html5lib_object, omit_optional_tags=False)
+
         def removeNonAscii(s): return "".join(i for i in s if ord(i)<0)
-        html_string = ' '.join([itm for itm in output_generator])
+
+        html_string = ''.join([itm for itm in output_generator])
 
         self.raw = html_string
 
 
-    def search(self, pattern):
+    def search(self, pattern, ignore_case):
         body = self.soup.find('body')
+
         try:
             lines = body.prettify().split('\n')
         except:
             return []
+
         matches = []
-        p = re.compile(pattern)
+
+        if ignore_case:
+          p = re.compile(pattern.lower())
+        else:
+          p = re.compile(pattern)
+
+
         for line in lines:
             line2 = utils.strip_tags(line)
+
+            if ignore_case:
+              line2 = line2.lower()
+
             m = p.search(line2)
+
             if m:
                 start = m.start()
                 match_obj = FileParser.MatchObj(line2, start, start + len(m.group(0)))
